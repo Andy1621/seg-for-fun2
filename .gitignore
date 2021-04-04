@@ -1,3 +1,19 @@
+# Dataset
+dataset/rs_data
+dataset/bi_data
+
+# log and model
+saved_log/
+saved_model/
+output/
+
+# pretrain model
+pretrained_model/HRNet*
+pretrained_model/hrnet*
+pretrained_model/unet*
+pretrained_model/ocrnet*
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
