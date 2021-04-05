@@ -4,6 +4,9 @@ iters: 1000
 train_dataset:
   type: RemoteSensing
   train_dataset_root: /media/sdd/ckli/my_try/seg-for-fun2/data/rs_data/train_data
+  positive_train_dataset_list: class4_positive_train_aug.txt
+  negetive_train_dataset_list: train_list_without4.txt
+  negetive_ratio: 0.5
   transforms:
     - type: Resize
       target_size: [256, 256]
