@@ -35,6 +35,7 @@
             return x_sse + x_cse 
     ```
     只需要相应添加has_scse字段即可，预训练模型可直接使用ImageNet-pretrained的backbone，参数加载时会忽略无法加载的字段。
+    读者可参考[合集：基于Paddle2.0的含有注意力机制的卷积网络](https://aistudio.baidu.com/aistudio/projectdetail/1562506?channelType=0&channel=0)实现更多attention。
 - 增加dataset：
     `paddleseg/datasets/remote_sensing.py`中添加了遥感影像数据集类，如下所示
     ```python

@@ -1,4 +1,7 @@
 # ./exp/prepare_dataset.sh划分训练集与验证集，对数据进行预处理（划分正负样本、原数据重采样、生成二分类数据）
+if  [ ! -d ./data ]; then
+    mkdir ./data
+
 if  [ ! -d ./data/rs_data ]; then
     mkdir ./data/rs_data
 fi
