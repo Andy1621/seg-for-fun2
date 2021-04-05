@@ -17,6 +17,9 @@ import random
 import cv2
 import numpy as np
 from PIL import Image
+from albumentations import (
+    RandomRotate90
+)
 
 from paddleseg.cvlibs import manager
 from paddleseg.transforms import functional
@@ -886,3 +889,22 @@ class RandomDistort:
             return (im, )
         else:
             return (im, label)
+
+
+@manager.TRANSFORMS.add_component
+class MyRandomRotate90:
+    """RandomRotate 90/180/270 for the input image.
+    Args:
+        p (float): probability of applying the transform. Default: 0.5.
+    Targets:
+        image
+    Image types:
+        uint8, float32
+    """
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, im, label=None):
+        aug = RandomRotate90(p=self.p)
+        aug_img = aug(image=im, mask=label)
+        return (aug_img['image'], aug_img['mask'])

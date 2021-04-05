@@ -1,7 +1,6 @@
 # Dataset
-dataset/rs_data
-dataset/bi_data
 data/
+raw_data/
 
 # log and model
 saved_log/

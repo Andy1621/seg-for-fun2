@@ -1,3 +1,9 @@
+'''
+Author: Kunchang Li
+Date: 2021-04-05 16:04:24
+LastEditors: Kunchang Li
+LastEditTime: 2021-04-05 16:04:34
+'''
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,3 +25,4 @@ from .ade import ADE20K
 from .optic_disc_seg import OpticDiscSeg
 from .pascal_context import PascalContext
 from .mini_deep_globe_road_extraction import MiniDeepGlobeRoadExtraction
+from .remote_sensing import RemoteSensing

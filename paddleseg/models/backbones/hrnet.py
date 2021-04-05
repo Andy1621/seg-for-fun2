@@ -51,6 +51,7 @@ class HRNet(nn.Layer):
         stage4_num_blocks (list, optional): Number of blocks per module for stage4. Default (4, 4, 4, 4).
         stage4_num_channels (list, optional): Number of channels per branch for stage4. Default (18, 36, 72. 144).
         has_se (bool, optional): Whether to use Squeeze-and-Excitation module. Default False.
+        has_scse (bool, optional): Whether to use scSE module. Default False.
         align_corners (bool, optional): An argument of F.interpolate. It should be set to False when the feature size is even,
             e.g. 1024x512, otherwise it is True, e.g. 769x769. Default: False.
     """
@@ -70,6 +71,7 @@ class HRNet(nn.Layer):
                  stage4_num_blocks=(4, 4, 4, 4),
                  stage4_num_channels=(18, 36, 72, 144),
                  has_se=False,
+                 has_scse=False,
                  align_corners=False):
         super(HRNet, self).__init__()
         self.pretrained = pretrained
@@ -86,6 +88,7 @@ class HRNet(nn.Layer):
         self.stage4_num_blocks = stage4_num_blocks
         self.stage4_num_channels = stage4_num_channels
         self.has_se = has_se
+        self.has_scse = has_scse
         self.align_corners = align_corners
         self.feat_channels = [sum(stage4_num_channels)]
 
@@ -110,6 +113,7 @@ class HRNet(nn.Layer):
             num_blocks=self.stage1_num_blocks[0],
             num_filters=self.stage1_num_channels[0],
             has_se=has_se,
+            has_scse=has_scse,
             name="layer2")
 
         self.tr1 = TransitionLayer(
@@ -123,6 +127,7 @@ class HRNet(nn.Layer):
             num_blocks=self.stage2_num_blocks,
             num_filters=self.stage2_num_channels,
             has_se=self.has_se,
+            has_scse=self.has_scse,
             name="st2",
             align_corners=align_corners)
 
@@ -136,6 +141,7 @@ class HRNet(nn.Layer):
             num_blocks=self.stage3_num_blocks,
             num_filters=self.stage3_num_channels,
             has_se=self.has_se,
+            has_scse=self.has_scse,
             name="st3",
             align_corners=align_corners)
 
@@ -149,6 +155,7 @@ class HRNet(nn.Layer):
             num_blocks=self.stage4_num_blocks,
             num_filters=self.stage4_num_channels,
             has_se=self.has_se,
+            has_scse=self.has_scse,
             name="st4",
             align_corners=align_corners)
         self.init_weight()
@@ -196,6 +203,7 @@ class Layer1(nn.Layer):
                  num_filters,
                  num_blocks,
                  has_se=False,
+                 has_scse=False,
                  name=None):
         super(Layer1, self).__init__()
 
@@ -208,6 +216,7 @@ class Layer1(nn.Layer):
                     num_channels=num_channels if i == 0 else num_filters * 4,
                     num_filters=num_filters,
                     has_se=has_se,
+                    has_scse=has_scse,
                     stride=1,
                     downsample=True if i == 0 else False,
                     name=name + '_' + str(i + 1)))
@@ -270,6 +279,7 @@ class Branches(nn.Layer):
                  in_channels,
                  out_channels,
                  has_se=False,
+                 has_scse=False,
                  name=None):
         super(Branches, self).__init__()
 
@@ -285,6 +295,7 @@ class Branches(nn.Layer):
                         num_channels=in_ch,
                         num_filters=out_channels[i],
                         has_se=has_se,
+                        has_scse=has_scse,
                         name=name + '_branch_layer_' + str(i + 1) + '_' +
                         str(j + 1)))
                 self.basic_block_list[i].append(basic_block_func)
@@ -304,12 +315,14 @@ class BottleneckBlock(nn.Layer):
                  num_channels,
                  num_filters,
                  has_se,
+                 has_scse,
                  stride=1,
                  downsample=False,
                  name=None):
         super(BottleneckBlock, self).__init__()
 
         self.has_se = has_se
+        self.has_scse = has_scse
         self.downsample = downsample
 
         self.conv1 = layers.ConvBNReLU(
@@ -348,6 +361,11 @@ class BottleneckBlock(nn.Layer):
                 num_filters=num_filters * 4,
                 reduction_ratio=16,
                 name=name + '_fc')
+        elif self.has_scse:
+            self.scse = scSELayer(
+                num_channels=num_filters * 4,
+                num_filters=num_filters * 4,
+                name=name + '_fc')
 
     def forward(self, x):
         residual = x
@@ -360,6 +378,8 @@ class BottleneckBlock(nn.Layer):
 
         if self.has_se:
             conv3 = self.se(conv3)
+        elif self.has_scse:
+            conv3 = self.scse(conv3)
 
         y = conv3 + residual
         y = F.relu(y)
@@ -372,11 +392,13 @@ class BasicBlock(nn.Layer):
                  num_filters,
                  stride=1,
                  has_se=False,
+                 has_scse=False,
                  downsample=False,
                  name=None):
         super(BasicBlock, self).__init__()
 
         self.has_se = has_se
+        self.has_scse = has_scse
         self.downsample = downsample
 
         self.conv1 = layers.ConvBNReLU(
@@ -407,6 +429,11 @@ class BasicBlock(nn.Layer):
                 num_filters=num_filters,
                 reduction_ratio=16,
                 name=name + '_fc')
+        elif self.has_scse:
+            self.scse = scSELayer(
+                num_channels=num_filters,
+                num_filters=num_filters,
+                name=name + '_fc')
 
     def forward(self, x):
         residual = x
@@ -418,6 +445,8 @@ class BasicBlock(nn.Layer):
 
         if self.has_se:
             conv2 = self.se(conv2)
+        elif self.has_scse:
+            conv2 = self.scse(conv2)
 
         y = conv2 + residual
         y = F.relu(y)
@@ -460,6 +489,30 @@ class SELayer(nn.Layer):
         return out
 
 
+class sSELayer(nn.Layer):
+    def __init__(self, num_channels, name=None):
+        super(sSELayer, self).__init__()
+        self.excitation = nn.Conv2D(num_channels, 1, 1, padding='same', bias_attr=False)
+
+    def forward(self, x):
+        excitation = self.excitation(x)
+        excitation = F.sigmoid(excitation)
+        out = x * excitation
+        return out
+
+
+class scSELayer(nn.Layer):
+    def __init__(self, num_channels, num_filters, name=None):
+        super(scSELayer, self).__init__()
+        self.sSE = sSELayer(num_channels, name=name + '_sSE')
+        self.cSE = SELayer(num_channels, num_filters=num_filters, reduction_ratio=2, name=name + '_cSE')
+    
+    def forward(self, x):
+        x_sse = self.sSE(x)
+        x_cse = self.cSE(x)
+        return x_sse + x_cse 
+
+
 class Stage(nn.Layer):
     def __init__(self,
                  num_channels,
@@ -467,6 +520,7 @@ class Stage(nn.Layer):
                  num_blocks,
                  num_filters,
                  has_se=False,
+                 has_scse=False,
                  multi_scale_output=True,
                  name=None,
                  align_corners=False):
@@ -484,6 +538,7 @@ class Stage(nn.Layer):
                         num_blocks=num_blocks,
                         num_filters=num_filters,
                         has_se=has_se,
+                        has_scse=has_scse,
                         multi_scale_output=False,
                         name=name + '_' + str(i + 1),
                         align_corners=align_corners))
@@ -495,6 +550,7 @@ class Stage(nn.Layer):
                         num_blocks=num_blocks,
                         num_filters=num_filters,
                         has_se=has_se,
+                        has_scse=has_scse,
                         name=name + '_' + str(i + 1),
                         align_corners=align_corners))
 
@@ -513,6 +569,7 @@ class HighResolutionModule(nn.Layer):
                  num_blocks,
                  num_filters,
                  has_se=False,
+                 has_scse=False,
                  multi_scale_output=True,
                  name=None,
                  align_corners=False):
@@ -523,6 +580,7 @@ class HighResolutionModule(nn.Layer):
             in_channels=num_channels,
             out_channels=num_filters,
             has_se=has_se,
+            has_scse=has_scse,
             name=name)
 
         self.fuse_func = FuseLayers(
